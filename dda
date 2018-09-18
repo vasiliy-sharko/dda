@@ -1,0 +1,50 @@
+#!/bin/bash
+trap '{ echo -e "\n\033[00mTerminating...\n"; exit 1; }' SIGINT SIGTERM
+
+print_r () {
+echo -e "$1 is most likely ${RED}not hosted with us${WHITE}\n";
+        read -p "Do you wish to dig the domain? (yes/no) > "
+        while true; do
+        case $REPLY in
+                y|yes|Yes|Y) { dig any +trace +nodnssec $1; exit 0; } ;;
+                n|no|No|N) break ;;
+                *) read -p  "Please select - Y or N > " ;;
+        esac
+        done
+        exit 0;
+}
+
+DOM=$1; shift
+[[ ! $DOM ]] && { echo "Please specify the domain"; exit 1; }
+
+IPW=$(dig +short $DOM)
+IPL=$(dig +short $DOM @dns12.namecheaphosting.com)
+RED="\033[0;31m"
+WHITE="\033[00m"
+
+
+[[ ${IPW:-007} == "162.255.118.194" ]] && { echo -e "$DOM is pointed to ${RED}EasyWP${WHITE}, good luck :)"; exit 0; }
+
+
+if [[ $IPW ]] && [[ $(whois $IPW 2>/dev/null | grep -Pci "^network:Network-Name:(server|premium|business|host\d{1,3}.*|shared.*)") > 0 ]] || [[ $(whois $IPW 2>/dev/null | grep -Pci "timico") > 0 ]] ; then                                                                                                                        
+        ANSWER=$(host $IPW 2>/dev/null | perl -p -e 's#.*\s(\w{4,}\d{1,3}).*#$1#;' 2>/dev/null )
+        [[ $ANSWER ]] && echo -e "\n$DOM is hosted at${RED} ${ANSWER} ${WHITE}" || print_r $DOM                                                                   
+        else
+        ANSWER=$(host $IPL 2>/dev/null | perl -p -e 's#.*\s(\w{4,}\d{1,3}).*#$1#;' 2>/dev/null )
+        [[ $ANSWER ]] && echo -e "\n$DOM is hosted at${RED} ${ANSWER} ${WHITE}" || print_r $DOM                                                                   
+fi
+
+CPUSR=$( [[ $ANSWER =~ ^h.* ]] && ssh wh@"$ANSWER".registrar-servers.com -p 12789 "sudo /scripts/whoowns $DOM" 2>/dev/null || ssh wh@"$ANSWER".web-hosting.com -p 12789 "sudo /scripts/whoowns $DOM" 2>/dev/null )
+[[ $CPUSR ]] && echo -e "cPanel user >> ${RED}${CPUSR}${WHITE}\n"
+
+#while true; do
+#        read -p "Do you wish to access the server? (yes/no) > "
+#        case $REPLY in
+#                y|yes|Yes|Y) if [[ $ANSWER =~ ^h.* ]]; then
+#                                { ssh wh@"$ANSWER".registrar-servers.com -p 12789 ; exit 0; }
+#                                else { ssh wh@"$ANSWER".web-hosting.com -p 12789; exit 0; }                                                                      
+#                                fi ;;
+#                n|no|No|N) break ;;
+#                *) read -p "Please select - Y or N > " ;;
+#        esac
+#done
